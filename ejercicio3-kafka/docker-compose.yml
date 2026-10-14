@@ -1,0 +1,118 @@
+x-kafka-env: &kafka-env
+  KAFKA_BROKERS: kafka:29092
+  ORDER_EVENTS_TOPIC: order-events
+  KAFKAJS_NO_PARTITIONER_WARNING: "1"
+
+services:
+  # Broker Kafka en modo KRaft (sin ZooKeeper), un solo nodo.
+  kafka:
+    image: apache/kafka:3.8.0
+    hostname: kafka
+    ports:
+      - "9092:9092" # para clientes que corren en tu máquina (localhost:9092)
+    environment:
+      CLUSTER_ID: 4L6g3nShT-eMCtK--X86sw
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_LISTENERS: INTERNAL://:29092,EXTERNAL://:9092,CONTROLLER://:9093
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka:29092,EXTERNAL://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT,CONTROLLER:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false" # el topic lo crea kafka-init con 3 particiones
+      KAFKA_LOG_RETENTION_HOURS: 168 # los eventos se conservan 7 días aunque ya se hayan leído
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092 > /dev/null 2>&1"]
+      interval: 10s
+      timeout: 10s
+      retries: 15
+      start_period: 15s
+
+  # Contenedor de un solo uso: crea el topic con 3 particiones y termina.
+  kafka-init:
+    image: apache/kafka:3.8.0
+    depends_on:
+      kafka:
+        condition: service_healthy
+    entrypoint: ["/opt/kafka/bin/kafka-topics.sh"]
+    command: ["--bootstrap-server", "kafka:29092", "--create", "--if-not-exists",
+              "--topic", "order-events", "--partitions", "3", "--replication-factor", "1"]
+
+  # UI web para ver topics, particiones, mensajes y consumer groups: http://localhost:8080
+  kafka-ui:
+    image: provectuslabs/kafka-ui:v0.7.2
+    ports:
+      - "8080:8080"
+    environment:
+      KAFKA_CLUSTERS_0_NAME: local
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:29092
+    depends_on:
+      kafka:
+        condition: service_healthy
+
+  mailpit:
+    image: axllent/mailpit:latest
+    ports:
+      - "8025:8025" # bandeja de entrada web: http://localhost:8025
+      - "1025:1025"
+
+  inventory-service:
+    build: ./inventory-service
+    environment:
+      PORT: 3001
+    ports:
+      - "3001:3001"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3001/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  orders-service:
+    build: ./orders-service
+    environment:
+      <<: *kafka-env
+      PORT: 3000
+      ORDER_EVENTS_PARTITIONS: 3
+      INVENTORY_REST_URL: http://inventory-service:3001
+    ports:
+      - "3000:3000"
+    depends_on:
+      kafka-init:
+        condition: service_completed_successfully
+      inventory-service:
+        condition: service_healthy
+    restart: unless-stopped
+
+  notification-service:
+    build: ./notification-service
+    environment:
+      <<: *kafka-env
+      KAFKA_GROUP_ID: notification-service
+      SMTP_HOST: mailpit
+      SMTP_PORT: 1025
+      MAIL_FROM: "Tienda SD <no-reply@tienda-sd.local>"
+    depends_on:
+      kafka-init:
+        condition: service_completed_successfully
+      mailpit:
+        condition: service_started
+    restart: unless-stopped
+
+  analytics-service:
+    build: ./analytics-service
+    environment:
+      <<: *kafka-env
+      KAFKA_GROUP_ID: analytics-service
+      PORT: 3003
+    ports:
+      - "3003:3003"
+    depends_on:
+      kafka-init:
+        condition: service_completed_successfully
+    restart: unless-stopped

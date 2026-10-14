@@ -1,0 +1,16 @@
+{
+  "name": "analytics-service",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Consume eventos de pedidos desde Kafka y calcula métricas",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "kafkajs": "^2.2.4"
+  }
+}

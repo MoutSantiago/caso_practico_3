@@ -1,0 +1,68 @@
+services:
+  rabbitmq:
+    image: rabbitmq:3.13-management
+    hostname: rabbitmq # el nombre del nodo depende del hostname: fijo para que el volumen sirva tras reiniciar
+    environment:
+      RABBITMQ_DEFAULT_USER: admin
+      RABBITMQ_DEFAULT_PASS: admin
+    ports:
+      - "5672:5672"   # AMQP
+      - "15672:15672" # UI de administración: http://localhost:15672 (admin/admin)
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq # colas durables y mensajes persistentes sobreviven a reinicios
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  mailpit:
+    image: axllent/mailpit:latest
+    ports:
+      - "8025:8025" # bandeja de entrada web: http://localhost:8025
+      - "1025:1025" # SMTP
+
+  inventory-service:
+    build: ./inventory-service
+    environment:
+      PORT: 3001
+    ports:
+      - "3001:3001"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3001/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  orders-service:
+    build: ./orders-service
+    environment:
+      PORT: 3000
+      RABBITMQ_URL: amqp://admin:admin@rabbitmq:5672
+      INVENTORY_REST_URL: http://inventory-service:3001
+    ports:
+      - "3000:3000"
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      inventory-service:
+        condition: service_healthy
+    restart: unless-stopped
+
+  notification-service:
+    build: ./notification-service
+    environment:
+      RABBITMQ_URL: amqp://admin:admin@rabbitmq:5672
+      SMTP_HOST: mailpit
+      SMTP_PORT: 1025
+      MAIL_FROM: "Tienda SD <no-reply@tienda-sd.local>"
+      PROCESSING_DELAY_MS: ${PROCESSING_DELAY_MS:-0}
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      mailpit:
+        condition: service_started
+    restart: unless-stopped
+
+volumes:
+  rabbitmq-data:

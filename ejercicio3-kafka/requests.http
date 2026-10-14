@@ -1,0 +1,33 @@
+@orders = http://localhost:3000
+@analytics = http://localhost:3003
+
+### 1) Crear pedido con stock -> OrderCreated + OrderConfirmed
+# @name crear
+POST {{orders}}/orders
+Content-Type: application/json
+
+{ "productId": "P001", "quantity": 2, "customerEmail": "ana@example.com" }
+
+### 2) Despachar el pedido anterior -> OrderShipped
+POST {{orders}}/orders/{{crear.response.body.id}}/ship
+
+### 3) Pedido sin stock -> OrderCreated + OrderRejected
+POST {{orders}}/orders
+Content-Type: application/json
+
+{ "productId": "P002", "quantity": 1, "customerEmail": "juan@example.com" }
+
+### 4) Reintentar confirmación de un pedido que quedó CREADO
+POST {{orders}}/orders/{{crear.response.body.id}}/confirm
+
+### Listar pedidos
+GET {{orders}}/orders
+
+### Estado de Orders (conexión a Kafka y eventos pendientes)
+GET {{orders}}/health
+
+### Métricas de Analytics
+GET {{analytics}}/stats
+
+### Línea de tiempo de un pedido según Analytics
+GET {{analytics}}/stats/orders/{{crear.response.body.id}}

@@ -1,0 +1,23 @@
+### Crear pedido -> publica PedidoCreado
+POST http://localhost:3000/orders
+Content-Type: application/json
+
+{ "productId": "P001", "quantity": 2, "customerEmail": "ana@example.com" }
+
+### Otro pedido
+POST http://localhost:3000/orders
+Content-Type: application/json
+
+{ "productId": "P003", "quantity": 1, "customerEmail": "juan@example.com" }
+
+### Sin stock (409, no se publica evento)
+POST http://localhost:3000/orders
+Content-Type: application/json
+
+{ "productId": "P002", "quantity": 1, "customerEmail": "ana@example.com" }
+
+### Estado de Orders (conexión a RabbitMQ y eventos pendientes)
+GET http://localhost:3000/health
+
+### Listar pedidos
+GET http://localhost:3000/orders

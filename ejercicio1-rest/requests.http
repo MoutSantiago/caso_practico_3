@@ -1,0 +1,26 @@
+### Pedido con stock (201 CONFIRMADO)
+POST http://localhost:3000/orders
+Content-Type: application/json
+
+{ "productId": "P001", "quantity": 2, "customerEmail": "ana@example.com" }
+
+### Pedido sin stock (409 RECHAZADO)
+POST http://localhost:3000/orders
+Content-Type: application/json
+
+{ "productId": "P002", "quantity": 1, "customerEmail": "ana@example.com" }
+
+### Producto inexistente (404)
+POST http://localhost:3000/orders
+Content-Type: application/json
+
+{ "productId": "P999", "quantity": 1, "customerEmail": "ana@example.com" }
+
+### Listar pedidos
+GET http://localhost:3000/orders
+
+### Consultar disponibilidad directamente en Inventory
+GET http://localhost:3001/inventory/P003/availability?quantity=5
+
+### Inventario completo
+GET http://localhost:3001/inventory

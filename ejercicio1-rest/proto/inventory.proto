@@ -1,0 +1,22 @@
+// Contrato gRPC de InventoryService (usado sólo para la comparación REST vs gRPC).
+syntax = "proto3";
+
+package inventory;
+
+service InventoryService {
+  // Consulta si hay stock suficiente de un producto.
+  rpc CheckAvailability (AvailabilityRequest) returns (AvailabilityReply);
+}
+
+message AvailabilityRequest {
+  string product_id = 1;
+  int32 quantity = 2;
+}
+
+message AvailabilityReply {
+  string product_id = 1;
+  string name = 2;
+  int32 requested = 3;
+  int32 stock = 4;
+  bool available = 5;
+}

@@ -1,0 +1,35 @@
+services:
+  inventory-service:
+    build:
+      context: .
+      dockerfile: inventory-service/Dockerfile
+    environment:
+      PORT: 3001
+      GRPC_PORT: 50051
+      SIMULATED_LATENCY_MS: ${SIMULATED_LATENCY_MS:-0}
+    ports:
+      - "3001:3001"
+      - "50051:50051"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3001/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  orders-service:
+    build:
+      context: .
+      dockerfile: orders-service/Dockerfile
+    environment:
+      PORT: 3000
+      # rest | grpc  ->  INVENTORY_PROTOCOL=grpc docker compose up
+      INVENTORY_PROTOCOL: ${INVENTORY_PROTOCOL:-rest}
+      INVENTORY_REST_URL: http://inventory-service:3001
+      INVENTORY_GRPC_ADDR: inventory-service:50051
+      INVENTORY_TIMEOUT_MS: 2000
+      INVENTORY_RETRIES: 2
+    ports:
+      - "3000:3000"
+    depends_on:
+      inventory-service:
+        condition: service_healthy
