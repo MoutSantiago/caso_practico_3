@@ -1,7 +1,6 @@
 x-kafka-env: &kafka-env
   KAFKA_BROKERS: kafka:29092
   ORDER_EVENTS_TOPIC: order-events
-  KAFKAJS_NO_PARTITIONER_WARNING: "1"
 
 services:
   # Broker Kafka en modo KRaft (sin ZooKeeper), un solo nodo.

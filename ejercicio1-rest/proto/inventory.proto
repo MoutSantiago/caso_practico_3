@@ -3,6 +3,8 @@ syntax = "proto3";
 
 package inventory;
 
+option csharp_namespace = "InventoryContract";
+
 service InventoryService {
   // Consulta si hay stock suficiente de un producto.
   rpc CheckAvailability (AvailabilityRequest) returns (AvailabilityReply);

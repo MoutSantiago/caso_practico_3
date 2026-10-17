@@ -22,11 +22,11 @@ Ej. 3   Orders ──REST──► Inventory
 ## Requisitos
 
 - **Docker Desktop** (con Docker Compose v2).
-- Opcional: Node.js 20+ si se quiere correr algún servicio fuera de Docker.
+- Opcional: .NET 8 SDK si se quiere correr algún servicio fuera de Docker (`dotnet run`).
 
-Los servicios están escritos en **Node.js** con `node:http` (sin frameworks, para que se vea el protocolo). Las
-librerías son las clientes oficiales o de facto de cada tecnología: `@grpc/grpc-js`, `amqplib`, `kafkajs` y
-`nodemailer`. Los correos se capturan con **Mailpit** (http://localhost:8025), así que no se envía nada real.
+Los servicios están escritos en **C# / .NET 8** con ASP.NET Core minimal APIs (sin MVC, para que se vea el protocolo). Las
+librerías son las clientes oficiales o de facto de cada tecnología: `Grpc.AspNetCore` / `Grpc.Net.Client`, `RabbitMQ.Client`, `Confluent.Kafka` y
+`System.Net.Mail`. Los correos se capturan con **Mailpit** (http://localhost:8025), así que no se envía nada real.
 
 ## Cómo correr un ejercicio
 

@@ -30,14 +30,14 @@ cambiando una variable de entorno.
 ejercicio1-rest/
 ├── docker-compose.yml
 ├── proto/inventory.proto          # contrato gRPC
-├── inventory-service/src/
-│   ├── data.js                    # stock en memoria (P001=10, P002=0, P003=3)
-│   ├── rest-server.js             # API REST
-│   └── grpc-server.js             # misma operación por gRPC
-└── orders-service/src/
-    ├── index.js                   # API de pedidos
-    ├── inventory-client.js        # cliente REST y cliente gRPC + reintentos
-    └── benchmark.js               # REST vs gRPC
+├── inventory-service/
+│   ├── Data.cs                    # stock en memoria (P001=10, P002=0, P003=3)
+│   ├── Program.cs                 # API REST
+│   └── GrpcService.cs             # misma operación por gRPC
+└── orders-service/
+    ├── Program.cs                 # API de pedidos
+    ├── InventoryClient.cs         # cliente REST y cliente gRPC + reintentos
+    └── Benchmark.cs               # REST vs gRPC
 ```
 
 ## Cómo ejecutarlo
@@ -104,7 +104,7 @@ El endpoint `POST /orders` no cambia. La respuesta muestra `"inventoryCheck": {"
 ### Benchmark REST vs gRPC
 
 ```bash
-docker compose exec orders-service node src/benchmark.js
+docker compose exec orders-service dotnet OrdersService.dll benchmark
 ```
 
 Mide latencia (p50/p95/p99) de llamadas secuenciales, throughput con 50 llamadas concurrentes y el tamaño del
