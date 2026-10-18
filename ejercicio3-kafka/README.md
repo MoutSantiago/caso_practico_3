@@ -35,7 +35,8 @@ Ejemplo de evento:
 | Servicio | URL |
 |---|---|
 | OrdersService | http://localhost:3000 |
-| AnalyticsService | http://localhost:3003/stats |
+| InventoryService | http://localhost:3001 |
+| AnalyticsService | http://localhost:3003 |
 | Kafka UI (topics, particiones, mensajes, consumer groups) | http://localhost:8080 |
 | Mailpit, bandeja de entrada | http://localhost:8025 |
 | Kafka para clientes externos | `localhost:9092` |
@@ -47,14 +48,52 @@ cd ejercicio3-kafka
 docker compose up --build
 ```
 
-Kafka tarda unos 20–30 s en estar listo. El contenedor `kafka-init` crea el topic con 3 particiones y termina
-(es normal ver `kafka-init exited with code 0`).
+Esto levanta:
+- **inventory-service** → `http://localhost:3001`
+- **orders-service** → `http://localhost:3000`
+- **analytics-service** → `http://localhost:3003`
+- **kafka** → `localhost:9092` (broker) + `http://localhost:8080` (UI)
+- **mailpit** → `http://localhost:8025` (correos de prueba)
+- **notification-service** → consume Kafka y envía correos (no expone HTTP)
+- **kafka-init** → crea el topic `order-events` con 3 particiones y termina (normal que salga con `exit code 0`)
+
+Kafka tarda unos 20–30 s en estar listo.
+
+## Cómo probar cada servicio
+
+### Endpoints disponibles
+
+| Servicio | Puerto | Endpoint | Método | Descripción |
+|----------|--------|----------|--------|-------------|
+| InventoryService | 3001 | `/health` | GET | Estado del servicio |
+| InventoryService | 3001 | `/inventory` | GET | Lista de productos con stock |
+| InventoryService | 3001 | `/inventory/{productId}` | GET | Detalle de un producto |
+| InventoryService | 3001 | `/inventory/{productId}/availability?quantity=N` | GET | Verificar stock disponible |
+| OrdersService | 3000 | `/health` | GET | Estado del servicio (incluye `kafka` y `pendingEvents`) |
+| OrdersService | 3000 | `/orders` | GET | Listar todos los pedidos |
+| OrdersService | 3000 | `/orders/{id}` | GET | Detalle de un pedido |
+| OrdersService | 3000 | `/orders` | POST | Crear un pedido (cuerpo: `productId`, `quantity`, `customerEmail`) |
+| OrdersService | 3000 | `/orders/{id}/ship` | POST | Marcar pedido como enviado (genera `OrderShipped`) |
+| OrdersService | 3000 | `/orders/{id}/confirm` | POST | Confirmar un pedido pendiente (genera `OrderConfirmed`) |
+| AnalyticsService | 3003 | `/stats` | GET | Métricas globales de pedidos |
+| AnalyticsService | 3003 | `/stats/orders/{id}` | GET | Línea de tiempo de un pedido (partición y offsets) |
+
+### Comandos de prueba (`curl`)
 
 ```bash
+# --- Health ---
+curl http://localhost:3001/health          # inventory
+curl http://localhost:3000/health          # orders (muestra kafka: conectado)
+
+# --- Inventario ---
+curl http://localhost:3001/inventory
+curl http://localhost:3001/inventory/P001
+curl "http://localhost:3001/inventory/P003/availability?quantity=5"
+
 # 1. Crear un pedido: genera OrderCreated + OrderConfirmed
 curl -X POST http://localhost:3000/orders -H "Content-Type: application/json" \
   -d '{"productId":"P001","quantity":2,"customerEmail":"ana@example.com"}'
-#    -> copiar el "id" de la respuesta
+#    -> copiar el "id" de la respuesta (ej. <id>)
 
 # 2. Despacharlo: genera OrderShipped
 curl -X POST http://localhost:3000/orders/<id>/ship
@@ -63,10 +102,14 @@ curl -X POST http://localhost:3000/orders/<id>/ship
 curl -X POST http://localhost:3000/orders -H "Content-Type: application/json" \
   -d '{"productId":"P002","quantity":1,"customerEmail":"juan@example.com"}'
 
+# Si Inventory está caído, el pedido queda CREADO (202). Confirmarlo después:
+# curl -X POST http://localhost:3000/orders/<id>/confirm
+
 # 4. Ver resultados
 curl http://localhost:3003/stats              # métricas de Analytics
-curl http://localhost:3003/stats/orders/<id>  # línea de tiempo del pedido (con partición y offsets)
+curl http://localhost:3003/stats/orders/<id>  # línea de tiempo del pedido (partición y offsets)
 #    Correos: http://localhost:8025 (3 para ana, 2 para juan)
+#    Eventos en Kafka UI: http://localhost:8080 -> topic order-events
 ```
 
 Si InventoryService está caído al crear el pedido, este queda **CREADO** (respuesta `202`) y se confirma después con

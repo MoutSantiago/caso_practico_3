@@ -49,24 +49,80 @@ cd ejercicio1-rest
 docker compose up --build
 ```
 
-### Probar
+### Cómo probar cada servicio
+
+### 1. Levantar la pila
+
+Desde la carpeta del ejercicio:
+
+```bash
+cd ejercicio1-rest
+docker compose up --build
+```
+
+Esto levanta:
+- **inventory-service** → `http://localhost:3001` (REST) + gRPC en `localhost:50051`
+- **orders-service** → `http://localhost:3000`
+
+### 2. Endpoints disponibles
+
+| Servicio | Puerto | Endpoint | Método | Descripción |
+|----------|--------|----------|--------|-------------|
+| InventoryService | 3001 | `/health` | GET | Estado del servicio |
+| InventoryService | 3001 | `/inventory` | GET | Lista de productos con stock |
+| InventoryService | 3001 | `/inventory/{productId}` | GET | Detalle de un producto |
+| InventoryService | 3001 | `/inventory/{productId}/availability?quantity=N` | GET | Verificar stock disponible |
+| InventoryService | 50051 | `inventory.proto` | gRPC | `CheckAvailability` (opcional, vía `INVENTORY_PROTOCOL=grpc`) |
+| OrdersService | 3000 | `/health` | GET | Estado del servicio |
+| OrdersService | 3000 | `/orders` | GET | Listar todos los pedidos |
+| OrdersService | 3000 | `/orders/{id}` | GET | Detalle de un pedido |
+| OrdersService | 3000 | `/orders` | POST | Crear un pedido (cuerpo: `productId`, `quantity`, `customerEmail`) |
+
+### 3. Comandos de prueba (`curl`)
 
 Los ejemplos usan `curl` con sintaxis de bash (en Windows: **Git Bash**). También podés usar
 [`requests.http`](requests.http) con la extensión *REST Client* de VS Code, o PowerShell (ver el README principal).
 
 ```bash
-# 1) Pedido con stock -> 201 CONFIRMADO
-curl -X POST http://localhost:3000/orders -H "Content-Type: application/json" -d '{"productId":"P001","quantity":2,"customerEmail":"ana@example.com"}'
+# --- Health de ambos servicios ---
+curl http://localhost:3001/health
+curl http://localhost:3000/health
 
-# 2) Producto sin stock -> 409 RECHAZADO
-curl -X POST http://localhost:3000/orders -H "Content-Type: application/json" -d '{"productId":"P002","quantity":1,"customerEmail":"ana@example.com"}'
+# --- Inventario ---
+curl http://localhost:3001/inventory
+curl http://localhost:3001/inventory/P001
+curl "http://localhost:3001/inventory/P003/availability?quantity=5"
+
+# --- Pedidos ---
+# 1) Stock disponible -> 201 CONFIRMADO
+curl -X POST http://localhost:3000/orders -H "Content-Type: application/json" \
+  -d '{"productId":"P001","quantity":2,"customerEmail":"ana@example.com"}'
+
+# 2) Sin stock -> 409 RECHAZADO
+curl -X POST http://localhost:3000/orders -H "Content-Type: application/json" \
+  -d '{"productId":"P002","quantity":1,"customerEmail":"ana@example.com"}'
 
 # 3) Producto inexistente -> 404
-curl -X POST http://localhost:3000/orders -H "Content-Type: application/json" -d '{"productId":"P999","quantity":1,"customerEmail":"ana@example.com"}'
+curl -X POST http://localhost:3000/orders -H "Content-Type: application/json" \
+  -d '{"productId":"P999","quantity":1,"customerEmail":"ana@example.com"}'
 
-# Listar pedidos / consultar inventario directamente
+# Listar pedidos
 curl http://localhost:3000/orders
-curl "http://localhost:3001/inventory/P003/availability?quantity=5"
+```
+
+### 4. Usar gRPC en lugar de REST (sólo Inventory ↔ Orders)
+
+```bash
+# Linux / Git Bash
+INVENTORY_PROTOCOL=grpc docker compose up -d --build
+```
+
+La respuesta de `POST /orders` mostrará `"inventoryCheck": {"protocol": "grpc", ...}`.
+
+### 5. Benchmark REST vs gRPC
+
+```bash
+docker compose exec orders-service dotnet OrdersService.dll benchmark
 ```
 
 

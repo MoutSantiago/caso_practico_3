@@ -18,6 +18,7 @@ flowchart LR
 | Servicio | URL |
 |---|---|
 | OrdersService | http://localhost:3000 |
+| InventoryService | http://localhost:3001 |
 | RabbitMQ Management | http://localhost:15672 (usuario `admin`, contraseña `admin`) |
 | Mailpit, bandeja de entrada | http://localhost:8025 |
 
@@ -28,11 +29,55 @@ cd ejercicio2-rabbitmq
 docker compose up --build
 ```
 
-Crear un pedido (Git Bash; también podés usar [`requests.http`](requests.http)):
+Esto levanta:
+- **inventory-service** → `http://localhost:3001`
+- **orders-service** → `http://localhost:3000`
+- **rabbitmq** → `localhost:5672` (AMQP) + `http://localhost:15672` (UI de gestión)
+- **mailpit** → `http://localhost:8025` (bandeja de correos de prueba)
+- **notification-service** → consume la cola de RabbitMQ y envía correos (no expone HTTP)
+
+## Cómo probar cada servicio
+
+### Endpoints disponibles
+
+| Servicio | Puerto | Endpoint | Método | Descripción |
+|----------|--------|----------|--------|-------------|
+| InventoryService | 3001 | `/health` | GET | Estado del servicio |
+| InventoryService | 3001 | `/inventory` | GET | Lista de productos con stock |
+| InventoryService | 3001 | `/inventory/{productId}` | GET | Detalle de un producto |
+| InventoryService | 3001 | `/inventory/{productId}/availability?quantity=N` | GET | Verificar stock disponible |
+| OrdersService | 3000 | `/health` | GET | Estado del servicio (incluye `rabbitmq` y `pendingEvents`) |
+| OrdersService | 3000 | `/orders` | GET | Listar todos los pedidos |
+| OrdersService | 3000 | `/orders/{id}` | GET | Detalle de un pedido |
+| OrdersService | 3000 | `/orders` | POST | Crear un pedido (cuerpo: `productId`, `quantity`, `customerEmail`) |
+
+### Comandos de prueba (`curl`)
 
 ```bash
+# --- Health ---
+curl http://localhost:3001/health          # inventory
+curl http://localhost:3000/health          # orders (muestra rabbitmq: conectado)
+
+# --- Inventario ---
+curl http://localhost:3001/inventory
+curl http://localhost:3001/inventory/P001
+curl "http://localhost:3001/inventory/P003/availability?quantity=5"
+
+# --- Crear un pedido (respuesta 201, eventPublished: true) ---
 curl -X POST http://localhost:3000/orders -H "Content-Type: application/json" \
   -d '{"productId":"P001","quantity":2,"customerEmail":"ana@example.com"}'
+
+# --- Ver el correo en Mailpit ---
+# Abrir http://localhost:8025 en el navegador. Debería aparecer "Recibimos tu pedido #…"
+
+# --- Listar pedidos ---
+curl http://localhost:3000/orders
+```
+
+### Ver mensajes acumulados en RabbitMQ (cola de notificaciones)
+
+```bash
+docker compose exec rabbitmq rabbitmqctl list_queues name messages_ready messages_unacknowledged
 ```
 
 La respuesta llega al instante (`201`, `"eventPublished": true`) y el correo *"Recibimos tu pedido #…"* aparece en
